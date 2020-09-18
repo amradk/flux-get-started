@@ -1,0 +1,397 @@
+---
+apiVersion: helm.fluxcd.io/v1
+kind: HelmRelease
+metadata:
+  name: airflow
+  namespace: dexa
+spec:
+  chart:
+    repository: https://kubernetes-charts.storage.googleapis.com/
+    name: airflow
+    version: 7.6.0
+  values:
+    airflow:
+      ## configs for the docker image of the web/scheduler/worker
+      ##
+      image:
+        repository: apache/airflow
+        tag: 1.10.12-python3.6
+        ## values: Always or IfNotPresent
+        pullPolicy: IfNotPresent
+        pullSecret: ""
+
+      executor: KubernetesExecutor
+      fernetKey: "fnJ3Hi76jofz5234A3e3EjKba7KWtkCxHf7A9imkOgU="
+
+      config:
+        AIRFLOW__KUBERNETES__NAMESPACE: "demo"
+        AIRFLOW__KUBERNETES__WORKER_CONTAINER_REPOSITORY: "apache/airflow"
+        AIRFLOW__KUBERNETES__WORKER_CONTAINER_TAG: "1.10.10-python3.6"
+        AIRFLOW__KUBERNETES__RUN_AS_USER: "50000"
+        AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+        AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: "120"
+        AIRFLOW__CORE__DAG_FILE_PROCESSOR_TIMEOUT: "150"
+        AIRFLOW__WEBSERVER__PAGE_SIZE: "50"
+        AIRFLOW__CORE__PARALLELISM: "2"
+      
+      podAnnotations: {}
+
+      extraEnv: []
+
+      extraConfigmapMounts: []
+      extraContainers: []
+      extraPipPackages:
+        - "argcomplete"
+      extraVolumeMounts: []
+      extraVolumes: []
+
+    scheduler:
+      resources:
+        requests:
+          cpu: "1000m"
+          memory: "512Mi"
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+      labels: {}
+      podLabels: {}
+      annotations: {}
+      podAnnotations: {}
+      podDisruptionBudget:
+        enabled: true
+
+        maxUnavailable: "100%"
+        minAvailable: ""
+
+      connections: []
+      variables: |
+        { "env_type": "stage" }
+      pools: |
+        {}
+      numRuns: -1
+      initdb: true
+      preinitdb: false
+      initialStartupDelay: 0
+      extraInitContainers: []
+
+    web:
+
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "256Mi"
+
+      replicas: 1
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+      labels: {}
+      podLabels: {}
+      annotations: {}
+      podAnnotations: {}
+      service:
+        annotations: {}
+        sessionAffinity: "None"
+        sessionAffinityConfig: {}
+        type: ClusterIP
+        externalPort: 8080
+        loadBalancerIP: ""
+        loadBalancerSourceRanges: []
+        nodePort:
+          http: ""
+      baseUrl: "http://localhost:8080/dexa/airflow"
+      serializeDAGs: false
+      extraPipPackages: []
+      initialStartupDelay: 0
+      minReadySeconds: 5
+
+      readinessProbe:
+        enabled: false
+        scheme: HTTP
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 1
+        successThreshold: 1
+        failureThreshold: 3
+
+      livenessProbe:
+        enabled: true
+        scheme: HTTP
+        initialDelaySeconds: 300
+        periodSeconds: 30
+        timeoutSeconds: 3
+        successThreshold: 1
+        failureThreshold: 2
+
+      secretsDir: /var/airflow/secrets
+
+      secrets: []
+      secretsMap:
+    workers:
+      ## if the airflow workers StatefulSet should be deployed
+      ##
+      enabled: false
+      resources: {}
+      replicas: 1
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+      labels: {}
+      podLabels: {}
+      annotations: {}
+      podAnnotations: {}
+      autoscaling:
+        enabled: false
+        maxReplicas: 2
+        metrics: []
+
+      initialStartupDelay: 0
+      celery:
+
+        instances: 1
+
+        gracefullTermination: false
+
+      terminationPeriod: 60
+
+      secretsDir: /var/airflow/secrets
+
+      secrets: []
+
+      secretsMap:
+
+    ###################################
+    # Airflow - Flower Configs
+    ###################################
+    flower:
+      enabled: false
+      resources: {}
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+      labels: {}
+      podLabels: {}
+      annotations: {}
+      podAnnotations: {}
+
+      basicAuthSecret: ""
+      basicAuthSecretKey: ""
+      urlPrefix: ""
+
+      service:
+        annotations: {}
+        type: ClusterIP
+        externalPort: 5555
+        loadBalancerIP: ""
+        loadBalancerSourceRanges: []
+
+      initialStartupDelay: 0
+      extraConfigmapMounts: []
+
+    ###################################
+    # Airflow - Logs Configs
+    ###################################
+    logs:
+      ## the airflow logs folder
+      ##
+      path: /opt/airflow/logs
+      persistence:
+        enabled: false
+        existingClaim: ""
+        subPath: ""
+        storageClass: ""
+        accessMode: ReadWriteMany
+        size: 1Gi
+
+    ###################################
+    # Airflow - DAGs Configs
+    ###################################
+    dags:
+      path: "/dags/repo"
+      doNotPickle: false
+      installRequirements: false
+      persistence:
+        enabled: false
+        existingClaim: ""
+        subPath: ""
+        storageClass: ""
+        accessMode: ReadOnlyMany
+        size: 1Gi
+
+      ## configs for the DAG git repository & sync container
+      ##
+      git:
+        url: ""
+        ref: ""
+        secret: ""
+        gitSync:
+          enabled: flase
+          resources: {}
+
+          image:
+            repository: alpine/git
+            tag: latest
+            pullPolicy: Always
+          refreshTime: 60
+
+      initContainer:
+        enabled: false
+        resources: {}
+
+        ## the docker image for the git-clone container
+        image:
+          repository: alpine/git
+          tag: latest
+          ## values: Always or IfNotPresent
+          pullPolicy: Always
+
+        mountPath: "/dags"
+        syncSubPath: ""
+
+    ###################################
+    # Kubernetes - Ingress Configs
+    ###################################
+    ingress:
+      enabled: false
+
+      ## configs for the Ingress of the web Service
+      ##
+      web:
+        annotations: {}
+        path: "/demo/airflow"
+        host: ""
+        livenessPath: ""
+
+        ## configs for web Ingress TLS
+        ##
+        tls:
+          enabled: false
+          secretName: ""
+        precedingPaths: []
+        succeedingPaths: []
+
+      flower:
+        annotations: {}
+        path: ""
+        host: ""
+        livenessPath: ""
+
+        tls:
+          enabled: false
+          secretName: ""
+
+    ###################################
+    # Kubernetes - RBAC
+    ###################################
+    rbac:
+      create: true
+
+    ###################################
+    # Kubernetes - Service Account
+    ###################################
+    serviceAccount:
+      create: true
+      name: ""
+      annotations: {}
+    extraManifests: []
+
+    ###################################
+    # Database - PostgreSQL Chart
+    # - https://github.com/helm/charts/tree/master/stable/postgresql
+    ###################################
+    postgresql:
+      enabled: enable
+      postgresqlDatabase: airflow
+      postgresqlUsername: postgres
+      postgresqlPassword: airflow
+      existingSecret: ""
+      existingSecretKey: "postgresql-password"
+
+      persistence:
+        enabled: false
+        storageClass: ""
+        accessModes:
+          - ReadWriteOnce
+        size: 8Gi
+
+    ###################################
+    # Database - External Database
+    # - these configs are only used when `postgresql.enabled` is false
+    ###################################
+    externalDatabase:
+      type: ""
+      host: ""
+      port: ""
+      database: airflowdevdb
+      user: airflowdev
+      passwordSecret: "psqlpass"
+      passwordSecretKey: "password"
+
+    ###################################
+    # Database - Redis Chart
+    # - https://github.com/helm/charts/tree/master/stable/redis
+    ###################################
+    redis:
+      enabled: false
+      password: airflow
+      existingSecret: ""
+      existingSecretKey: "redis-password"
+
+      ## configs for redis cluster mode
+      ##
+      cluster:
+        enabled: false
+        slaveCount: 1
+
+      ## configs for the redis master
+      ##
+      master:
+        resources: {}
+        persistence:
+          enabled: false
+          storageClass: ""
+          accessModes:
+          - ReadWriteOnce
+          size: 8Gi
+
+      ## configs for the redis slaves
+      ##
+      slave:
+        resources: {}
+        persistence:
+          enabled: false
+          storageClass: ""
+          accessModes:
+            - ReadWriteOnce
+          size: 8Gi
+
+    ###################################
+    # Database - External Database
+    # - these configs are only used when `redis.enabled` is false
+    ###################################
+    externalRedis:
+      host: localhost
+      port: 6379
+      databaseNumber: 1
+      passwordSecret: ""
+      passwordSecretKey: "redis-password"
+
+    ###################################
+    # Prometheus - ServiceMonitor
+    ###################################
+    serviceMonitor:
+      enabled: false
+      ## labels for ServiceMonitor, so that Prometheus can select it
+      ##
+      selector:
+        prometheus: kube-prometheus
+      path: /admin/metrics
+      interval: "30s"
+
+    ###################################
+    # Prometheus - PrometheusRule
+    ###################################
+    prometheusRule:
+      enabled: false
+      additionalLabels: {}
+      groups: []
