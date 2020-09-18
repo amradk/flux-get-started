@@ -3,7 +3,7 @@ apiVersion: helm.fluxcd.io/v1
 kind: HelmRelease
 metadata:
   name: airflow
-  namespace: dexa
+  namespace: demo
 spec:
   chart:
     repository: https://kubernetes-charts.storage.googleapis.com/

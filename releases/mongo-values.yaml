@@ -3,11 +3,11 @@ apiVersion: helm.fluxcd.io/v1
 kind: HelmRelease
 metadata:
   name: mongodb
-  namespace: dexa
+  namespace: demo
   annotations:
     fluxcd.io/automated: "true"
 spec:
-  targetNamespace: dexa
+  targetNamespace: demo
   chart:
     repository: https://kubernetes-charts.storage.googleapis.com/
     name: mongodb-replicaset
